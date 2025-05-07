@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Text-to-Image Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+            padding: 2rem;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-weight: 500;
+            color: #ffffff;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 1rem;
+            background: #1e1e1e;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 0.75rem;
+            text-align: center;
+            cursor: pointer;
+            background-color: #1e1e1e;
+            color: #ccc;
+            transition: background-color 0.3s;
+        }
+
+        .tab.active {
+            background-color: #2d2d2d;
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .input-section {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            background: #1e1e1e;
+            color: #fff;
+        }
+
+        button {
+            padding: 0.75rem 1.2rem;
+            font-size: 1rem;
+            border: none;
+            border-radius: 6px;
+            background-color: #3f51b5;
+            color: #fff;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #5c6bc0;
+        }
+
+        .image-container {
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .image-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.05);
+        }
+
+        .image-container p {
+            margin-top: 0.5rem;
+            font-size: 0.95rem;
+            color: #ccc;
+        }
+
+        #error {
+            color: #ff6b6b;
+            margin-top: 0.5rem;
+        }
+
+        #loading {
+            color: #ccc;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Text-to-Image Generator</h1>
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('generate')">Generate</div>
+            <div class="tab" onclick="switchTab('gallery')">Gallery</div>
+        </div>
+
+        <div id="generate" class="tab-content active">
+            <input type="text" id="prompt" placeholder="Enter your prompt..." />
+            <button onclick="generateImage()">Generate</button>
+            <div class="loading" id="loading" style="display: none;">Generating image...</div>
+            <div class="error" id="error"></div>
+            <div class="image-preview" id="imagePreview"></div>
+        </div>
+
+        <div id="gallery" class="tab-content">
+            <div class="gallery" id="galleryContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        const gallery = [];
+    
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    
+            document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+    
+        async function generateImage() {
+            const prompt = document.getElementById('prompt').value;
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const imagePreview = document.getElementById('imagePreview');
+    
+            if (!prompt.trim()) {
+                error.textContent = "Please enter a prompt.";
+                return;
+            }
+    
+            loading.style.display = 'block';
+            error.textContent = '';
+            imagePreview.innerHTML = '';
+    
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+    
+                const data = await response.json();
+                loading.style.display = 'none';
+    
+                if (data.error) {
+                    error.textContent = data.error;
+                } else {
+                    const container = document.createElement('div');
+                    const img = new Image();
+                    img.src = 'data:image/png;base64,' + data.image;
+                    const caption = document.createElement('p');
+                    caption.textContent = prompt;
+                    caption.style.fontSize = "0.95rem";
+                    caption.style.color = "#555";
+                    caption.style.marginTop = "0.5rem";
+    
+                    container.appendChild(img);
+                    container.appendChild(caption);
+                    imagePreview.appendChild(container);
+    
+                    // Save to gallery
+                    gallery.push({ src: img.src, prompt });
+                    updateGallery();
+                }
+            } catch (err) {
+                loading.style.display = 'none';
+                error.textContent = 'Something went wrong: ' + err.message;
+            }
+        }
+    
+        function updateGallery() {
+            const galleryContainer = document.getElementById('galleryContainer');
+            galleryContainer.innerHTML = '';
+            gallery.slice().reverse().forEach(item => {
+                const container = document.createElement('div');
+                const img = new Image();
+                img.src = item.src;
+                const caption = document.createElement('p');
+                caption.textContent = item.prompt;
+                caption.style.fontSize = "0.9rem";
+                caption.style.color = "#444";
+                caption.style.marginTop = "0.25rem";
+    
+                container.appendChild(img);
+                container.appendChild(caption);
+                galleryContainer.appendChild(container);
+            });
+        }
+    </script>
+    
+</body>
+</html>
